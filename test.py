@@ -52,8 +52,10 @@ while True:
     runs_data = runs_response.json()
 
     for run in runs_data['workflow_runs']:
-        if run['head_branch'] == BRANCH and run['status'] == 'in_progress' and f'Python Script Trigger - {trigger_id}' in run['name']:
+        print(run['name'])
+        if run['name'] == f'Python Script Trigger - {trigger_id}':
             workflow_run_id = run['id']
+            print(f'Found workflow run ID: {workflow_run_id}')  # Added logging
             break
 
     if workflow_run_id:
@@ -68,10 +70,7 @@ run_url = f'https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/runs/{
 # Wait for the workflow to complete
 while True:
     run_response = requests.get(run_url, headers=headers)
-    print(run_response.text)
     run_data = run_response.json()
-
-    print(run_data)
 
     if run_data['status'] == 'completed':
         break
@@ -81,3 +80,41 @@ while True:
 
 # Print the workflow run conclusion
 print(f'Workflow run conclusion: {run_data["conclusion"]}')
+
+def fetch_workflow_logs(job_id, headers):
+    # Fetch job logs
+    logs_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/jobs/{job_id}/logs"
+    logs_response = requests.get(logs_url, headers=headers)
+
+    if logs_response.status_code == 200:
+        logs_text = logs_response.text
+        print("Workflow Logs:")
+        print(logs_text)
+
+        # Extract output from logs (example: find lines with "result=")
+        for line in logs_text.split("\n"):
+            if "result=" in line:
+                output_value = line.split("result=")[-1].strip()
+                print(f"Extracted Output: {output_value}")
+                break
+    else:
+        print(f"Failed to fetch logs: {logs_response.text}")
+
+def fetch_workflow_artifacts(run_id, headers):
+    # Fetch artifacts for the workflow run
+    artifacts_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/runs/{run_id}/artifacts"
+    artifacts_response = requests.get(artifacts_url, headers=headers)
+
+    if artifacts_response.status_code == 200:
+        artifacts = artifacts_response.json()["artifacts"]
+        for artifact in artifacts:
+            if artifact["name"] == "workflow-output":
+                download_url = artifact["archive_download_url"]
+                print(f"Artifact Download URL: {download_url}")
+                break
+    else:
+        print(f"Failed to fetch artifacts: {artifacts_response.text}")
+
+# Example usage of the function
+# fetch_workflow_logs(job_id, headers)
+# fetch_workflow_artifacts(run_id, headers)
