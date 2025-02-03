@@ -1,4 +1,4 @@
-name: Python Script Trigger
+name: Python Script Trigger - ${{ github.event.inputs.trigger_id }}
 
 on:
   workflow_dispatch:

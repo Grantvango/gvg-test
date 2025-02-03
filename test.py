@@ -52,7 +52,7 @@ while True:
     runs_data = runs_response.json()
 
     for run in runs_data['workflow_runs']:
-        if run['head_branch'] == BRANCH and run['status'] == 'in_progress' and run['name'] == WORKFLOW_ID and run['event'] == 'workflow_dispatch' and run['trigger_id'] == trigger_id:
+        if run['head_branch'] == BRANCH and run['status'] == 'in_progress' and f'Python Script Trigger - {trigger_id}' in run['name']:
             workflow_run_id = run['id']
             break
 
@@ -68,7 +68,10 @@ run_url = f'https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/runs/{
 # Wait for the workflow to complete
 while True:
     run_response = requests.get(run_url, headers=headers)
+    print(run_response.text)
     run_data = run_response.json()
+
+    print(run_data)
 
     if run_data['status'] == 'completed':
         break
