@@ -13,75 +13,59 @@ REPO_NAME = 'gvg-test'
 WORKFLOW_ID = 'test.yml'  # Fixed workflow ID
 BRANCH = 'main'  # Fixed branch
 
-# Generate a unique trigger ID
-trigger_id = str(uuid.uuid4())
-
-# GitHub API endpoint to trigger the workflow
-trigger_url = f'https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/workflows/{WORKFLOW_ID}/dispatches'
-
 # Headers for the request
 headers = {
     'Authorization': f'Bearer {GITHUB_TOKEN}',
     'Accept': 'application/vnd.github+json'
 }
 
-# Data payload for the request
-data = {
-    'ref': BRANCH,  # Fixed branch
-    'inputs': {'trigger_id': trigger_id}  # Pass unique trigger ID
-}
+def trigger_workflow():
+    # Generate a unique trigger ID
+    trigger_id = str(uuid.uuid4())
 
-# Make the request to trigger the workflow
-trigger_response = requests.post(trigger_url, headers=headers, json=data)
+    # GitHub API endpoint to trigger the workflow
+    trigger_url = f'https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/workflows/{WORKFLOW_ID}/dispatches'
 
-# Check the response
-if trigger_response.status_code == 204:
-    print(f'Workflow triggered successfully with ID: {trigger_id}')
-else:
-    print(f'Failed to trigger workflow: {trigger_response.status_code}')
-    print(trigger_response.json())
-    exit(1)
+    # Data payload for the request
+    data = {
+        'ref': BRANCH,  # Fixed branch
+        'inputs': {'trigger_id': trigger_id}  # Pass unique trigger ID
+    }
 
-# GitHub API endpoint to get the workflow runs
-runs_url = f'https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/runs'
+    # Make the request to trigger the workflow
+    trigger_response = requests.post(trigger_url, headers=headers, json=data)
 
-# Wait for the workflow to start and get the workflow run ID
-workflow_run_id = None
-while True:
+    # Check the response
+    if trigger_response.status_code == 204:
+        print(f'Workflow triggered successfully with ID: {trigger_id}')
+    else:
+        print(f'Failed to trigger workflow: {trigger_response.status_code}')
+        print(trigger_response.json())
+        exit(1)
+
+    return trigger_id
+
+def get_workflow_runs():
+    runs_url = f'https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/runs'
     runs_response = requests.get(runs_url, headers=headers)
-    runs_data = runs_response.json()
+    if runs_response.status_code == 200:
+        return runs_response.json()['workflow_runs']
+    else:
+        print(f'Failed to fetch workflow runs: {runs_response.status_code}')
+        print(runs_response.json())
+        return []
 
-    for run in runs_data['workflow_runs']:
-        print(run['name'])
-        if run['name'] == f'Python Script Trigger - {trigger_id}':
-            workflow_run_id = run['id']
-            print(f'Found workflow run ID: {workflow_run_id}')  # Added logging
-            break
-
-    if workflow_run_id:
-        break
-
-    print('Waiting for workflow to start...')
-    time.sleep(10)
-
-# GitHub API endpoint to get the workflow run details
-run_url = f'https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/runs/{workflow_run_id}'
-
-# Wait for the workflow to complete
-while True:
+def get_specific_run(run_id):
+    run_url = f'https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/runs/{run_id}'
     run_response = requests.get(run_url, headers=headers)
-    run_data = run_response.json()
+    if run_response.status_code == 200:
+        return run_response.json()
+    else:
+        print(f'Failed to fetch workflow run: {run_response.status_code}')
+        print(run_response.json())
+        return None
 
-    if run_data['status'] == 'completed':
-        break
-
-    print('Waiting for workflow to complete...')
-    time.sleep(10)
-
-# Print the workflow run conclusion
-print(f'Workflow run conclusion: {run_data["conclusion"]}')
-
-def fetch_workflow_logs(job_id, headers):
+def fetch_workflow_logs(job_id):
     # Fetch job logs
     logs_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/jobs/{job_id}/logs"
     logs_response = requests.get(logs_url, headers=headers)
@@ -100,7 +84,7 @@ def fetch_workflow_logs(job_id, headers):
     else:
         print(f"Failed to fetch logs: {logs_response.text}")
 
-def fetch_workflow_artifacts(run_id, headers):
+def fetch_workflow_artifacts(run_id):
     # Fetch artifacts for the workflow run
     artifacts_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/runs/{run_id}/artifacts"
     artifacts_response = requests.get(artifacts_url, headers=headers)
@@ -115,6 +99,40 @@ def fetch_workflow_artifacts(run_id, headers):
     else:
         print(f"Failed to fetch artifacts: {artifacts_response.text}")
 
-# Example usage of the function
-# fetch_workflow_logs(job_id, headers)
-# fetch_workflow_artifacts(run_id, headers)
+if __name__ == "__main__":
+    trigger_id = trigger_workflow()
+
+    # Wait for the workflow to start and get the workflow run ID
+    workflow_run_id = None
+    while True:
+        runs = get_workflow_runs()
+        for run in runs:
+            if run['name'] == f'Python Script Trigger - {trigger_id}':
+                workflow_run_id = run['id']
+                print(f'Found workflow run ID: {workflow_run_id}')
+                break
+
+        if workflow_run_id:
+            break
+
+        print('Waiting for workflow to start...')
+        time.sleep(10)
+
+    # Wait for the workflow to complete
+    while True:
+        run_data = get_specific_run(workflow_run_id)
+        if run_data and run_data['status'] == 'completed':
+            break
+
+        print('Waiting for workflow to complete...')
+        time.sleep(10)
+
+    # Print the workflow run conclusion
+    print(f'Workflow run conclusion: {run_data["conclusion"]}')
+
+    # Fetch and print the workflow logs
+    for job in run_data['jobs']:
+        fetch_workflow_logs(job['id'])
+
+    # Fetch and print the artifact download URL
+    fetch_workflow_artifacts(workflow_run_id)
