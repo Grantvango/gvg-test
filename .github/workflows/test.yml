@@ -1,0 +1,12 @@
+name: Python Script Trigger
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-python-script:
+    runs-on: self-hosted
+
+    steps:
+      - name: Echo Hello World
+        run: echo "Hello, World!"
