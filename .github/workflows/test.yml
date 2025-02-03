@@ -2,6 +2,10 @@ name: Python Script Trigger
 
 on:
   workflow_dispatch:
+    inputs:
+      trigger_id:
+        description: 'Unique identifier for the workflow.'
+        required: true
 
 jobs:
   run-python-script:
