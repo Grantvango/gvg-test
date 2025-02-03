@@ -65,25 +65,6 @@ def get_specific_run(run_id):
         print(run_response.json())
         return None
 
-def fetch_workflow_logs(job_id):
-    # Fetch job logs
-    logs_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/jobs/{job_id}/logs"
-    logs_response = requests.get(logs_url, headers=headers)
-
-    if logs_response.status_code == 200:
-        logs_text = logs_response.text
-        print("Workflow Logs:")
-        print(logs_text)
-
-        # Extract output from logs (example: find lines with "result=")
-        for line in logs_text.split("\n"):
-            if "result=" in line:
-                output_value = line.split("result=")[-1].strip()
-                print(f"Extracted Output: {output_value}")
-                break
-    else:
-        print(f"Failed to fetch logs: {logs_response.text}")
-
 def fetch_workflow_artifacts(run_id):
     # Fetch artifacts for the workflow run
     artifacts_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/runs/{run_id}/artifacts"
@@ -93,8 +74,11 @@ def fetch_workflow_artifacts(run_id):
         artifacts = artifacts_response.json()["artifacts"]
         for artifact in artifacts:
             if artifact["name"] == "workflow-output":
-                download_url = artifact["archive_download_url"]
+                artifact_id = artifact["id"]
+                download_url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/actions/runs/{run_id}/artifacts/{artifact_id}"
+                action_url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/actions/runs/{run_id}"
                 print(f"Artifact Download URL: {download_url}")
+                print(f"Action URL: {action_url}")
                 break
     else:
         print(f"Failed to fetch artifacts: {artifacts_response.text}")
@@ -129,10 +113,6 @@ if __name__ == "__main__":
 
     # Print the workflow run conclusion
     print(f'Workflow run conclusion: {run_data["conclusion"]}')
-
-    # Fetch and print the workflow logs
-    for job in run_data['jobs']:
-        fetch_workflow_logs(job['id'])
 
     # Fetch and print the artifact download URL
     fetch_workflow_artifacts(workflow_run_id)
